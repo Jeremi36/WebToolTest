@@ -499,17 +499,26 @@ app.get("/admin", requireAdmin, async (req, res) => {
     <div class="box">
       <h2>Latest Conversations</h2>
       <table>
-        <tr>
-          <th>Code</th><th>License</th><th>Updated</th><th>View</th>
-        </tr>
-        ${conversations.rows.map(c => `
-          <tr>
-            <td>${c.conversation_code}</td>
-            <td>${c.license_key}</td>
-            <td>${c.updated_at}</td>
-            <td><a href="/admin/conversation/${c.conversation_code}">Open</a></td>
-          </tr>
-        `).join("")}
+<tr>
+  <th>Code</th>
+  <th>License</th>
+  <th>Updated</th>
+  <th>View</th>
+  <th>Delete</th>
+</tr>        ${conversations.rows.map(c => `
+  <tr>
+    <td>${c.conversation_code}</td>
+    <td>${c.license_key}</td>
+    <td>${c.updated_at}</td>
+    <td><a href="/admin/conversation/${c.conversation_code}">Open</a></td>
+    <td>
+      <form method="POST" action="/admin/delete-conversation" style="display:inline;">
+        <input type="hidden" name="conversation_code" value="${c.conversation_code}">
+        <button>Delete</button>
+      </form>
+    </td>
+  </tr>
+`).join("")}
       </table>
     </div>
   `));
@@ -593,7 +602,6 @@ app.post("/admin/delete-license", requireAdmin, async (req, res) => {
 });
 
 app.get("/admin/conversation/:code", requireAdmin, async (req, res) => {
-  const pass = req.query.pass;
   const code = req.params.code;
 
   const result = await pool.query(
@@ -606,11 +614,74 @@ app.get("/admin/conversation/:code", requireAdmin, async (req, res) => {
   }
 
   const convo = result.rows[0];
+  const history = Array.isArray(convo.history) ? convo.history : [];
+
+  const renderedMessages = history.map(m => {
+    const role = m.role === "assistant" ? "AI" : "User";
+    let text = "";
+    let hasScreenshot = false;
+
+    if (Array.isArray(m.content)) {
+      for (const part of m.content) {
+        if (part.type === "text") text += part.text || "";
+        if (part.type === "image_url") hasScreenshot = true;
+      }
+    } else {
+      text = m.content || "";
+    }
+
+    return `
+      <div class="box">
+        <h3>${role}${role === "User" ? (hasScreenshot ? " (Screenshot attached)" : " (No screenshot attached)") : ""}</h3>
+        <pre style="white-space:pre-wrap;">${text}</pre>
+      </div>
+    `;
+  }).join("");
 
   res.send(page(`Conversation ${code}`, `
     <p><a href="/admin">Back</a></p>
-    <pre style="white-space:pre-wrap;background:#1d1d1d;padding:20px;border-radius:16px;">${JSON.stringify(convo.history, null, 2)}</pre>
+
+    <form method="POST" action="/admin/delete-conversation" style="display:inline;">
+      <input type="hidden" name="conversation_code" value="${code}">
+      <button>Delete Conversation</button>
+    </form>
+
+    <a href="/admin/conversation/${code}/download">
+      <button type="button">Download JSON</button>
+    </a>
+
+    <hr>
+
+    ${renderedMessages}
   `));
+});
+
+app.get("/admin/conversation/:code/download", requireAdmin, async (req, res) => {
+  const code = req.params.code;
+
+  const result = await pool.query(
+    "SELECT history FROM conversations WHERE conversation_code=$1",
+    [code]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).send("Conversation not found");
+  }
+
+  res.setHeader("Content-Disposition", `attachment; filename="${code}.json"`);
+  res.setHeader("Content-Type", "application/json");
+  res.send(JSON.stringify(result.rows[0].history, null, 2));
+});
+
+app.post("/admin/delete-conversation", requireAdmin, async (req, res) => {
+  const { conversation_code } = req.body;
+
+  await pool.query(
+    "DELETE FROM conversations WHERE conversation_code=$1",
+    [conversation_code]
+  );
+
+  res.redirect("/admin");
 });
 
 initDb().then(() => {
