@@ -231,6 +231,29 @@ function requireAdmin(req, res, next) {
   `));
 }
 
+app.post("/admin/login", (req, res) => {
+  const { password } = req.body;
+
+  if (password !== ADMIN_PASSWORD) {
+    return res.send(page("Admin Login", `
+      <p style="color:red;">Incorrect password.</p>
+      <form method="POST" action="/admin/login">
+        <input name="password" type="password" placeholder="Admin password" required>
+        <button>Login</button>
+      </form>
+    `));
+  }
+
+  req.session.isAdminAuthenticated = true;
+  res.redirect("/admin");
+});
+
+app.get("/admin/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.redirect("/admin");
+  });
+});
+
 app.get("/", (req, res) => {
   res.json({ status: "OK", message: "WebToolTest API online" });
 });
