@@ -3,12 +3,23 @@ const cors = require("cors");
 const OpenAI = require("openai");
 const { Pool } = require("pg");
 const crypto = require("crypto");
+const session = require("express-session");
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.set("trust proxy", true);
+app.use(session({
+  secret: process.env.SESSION_SECRET || "change-this-secret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: true,
+    httpOnly: true,
+    sameSite: "lax"
+  }
+}));
 
 const PORT = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -208,16 +219,16 @@ function page(title, body) {
 }
 
 function requireAdmin(req, res, next) {
-  const pass = req.query.pass || req.body.pass;
-  if (pass !== ADMIN_PASSWORD) {
-    return res.send(page("Admin Login", `
-      <form method="GET" action="/admin">
-        <input name="pass" type="password" placeholder="Admin password">
-        <button>Login</button>
-      </form>
-    `));
+  if (req.session && req.session.isAdminAuthenticated) {
+    return next();
   }
-  next();
+
+  return res.send(page("Admin Login", `
+    <form method="POST" action="/admin/login">
+      <input name="password" type="password" placeholder="Admin password" required>
+      <button>Login</button>
+    </form>
+  `));
 }
 
 app.get("/", (req, res) => {
