@@ -507,7 +507,7 @@ app.get("/admin", requireAdmin, async (req, res) => {
             <td>${c.conversation_code}</td>
             <td>${c.license_key}</td>
             <td>${c.updated_at}</td>
-            <td><a href="/admin/conversation/${c.conversation_code}?pass=${pass}">Open</a></td>
+            <td><a href="/admin/conversation/${c.conversation_code}">Open</a></td>
           </tr>
         `).join("")}
       </table>
@@ -524,7 +524,7 @@ app.post("/admin/random-license", requireAdmin, async (req, res) => {
     VALUES ($1, $2, true)
   `, [licenseKey, tier]);
 
-  res.redirect(`/admin?pass=${pass}`);
+  res.redirect(`/admin`);
 });
 
 app.post("/admin/licenses", requireAdmin, async (req, res) => {
@@ -536,7 +536,7 @@ app.post("/admin/licenses", requireAdmin, async (req, res) => {
     ON CONFLICT (license_key) DO NOTHING
   `, [license_key, tier]);
 
-  res.redirect(`/admin?pass=${pass}`);
+  res.redirect(`/admin`);
 });
 
 app.post("/admin/update-tier", requireAdmin, async (req, res) => {
@@ -555,7 +555,7 @@ app.post("/admin/update-tier", requireAdmin, async (req, res) => {
     tier
   ]);
 
-  res.redirect(`/admin?pass=${pass}`);
+  res.redirect(`/admin`);
 });
 
 app.post("/admin/toggle-license", requireAdmin, async (req, res) => {
@@ -567,7 +567,7 @@ app.post("/admin/toggle-license", requireAdmin, async (req, res) => {
     WHERE license_key=$1
   `, [license_key]);
 
-  res.redirect(`/admin?pass=${pass}`);
+  res.redirect(`/admin`);
 });
 
 app.post("/admin/reset-devices", requireAdmin, async (req, res) => {
@@ -578,7 +578,7 @@ app.post("/admin/reset-devices", requireAdmin, async (req, res) => {
     WHERE license_key=$1
   `, [license_key]);
 
-  res.redirect(`/admin?pass=${pass}`);
+  res.redirect(`/admin`);
 });
 
 app.post("/admin/delete-license", requireAdmin, async (req, res) => {
@@ -589,7 +589,7 @@ app.post("/admin/delete-license", requireAdmin, async (req, res) => {
   await pool.query("DELETE FROM request_logs WHERE license_key=$1", [license_key]);
   await pool.query("DELETE FROM licenses WHERE license_key=$1", [license_key]);
 
-  res.redirect(`/admin?pass=${pass}`);
+  res.redirect(`/admin`);
 });
 
 app.get("/admin/conversation/:code", requireAdmin, async (req, res) => {
@@ -608,7 +608,7 @@ app.get("/admin/conversation/:code", requireAdmin, async (req, res) => {
   const convo = result.rows[0];
 
   res.send(page(`Conversation ${code}`, `
-    <p><a href="/admin?pass=${pass}">Back</a></p>
+    <p><a href="/admin">Back</a></p>
     <pre style="white-space:pre-wrap;background:#1d1d1d;padding:20px;border-radius:16px;">${JSON.stringify(convo.history, null, 2)}</pre>
   `));
 });
