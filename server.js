@@ -7,6 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.set("trust proxy", true);
 
 const PORT = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -95,7 +96,10 @@ app.get("/", (req, res) => {
 
 app.post("/validate", async (req, res) => {
   const { license, hwid } = req.body;
-  const ip = req.ip;
+  const ip =
+  req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+  req.socket.remoteAddress ||
+  "";
 
   if (!license || !hwid) {
     return res.json({ status: "ERROR", message: "Missing fields" });
