@@ -1,0 +1,14 @@
+{
+  "name": "webtooltest",
+  "version": "1.0.0",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "cors": "^2.8.5",
+    "openai": "^4.104.0"
+  }
+}
