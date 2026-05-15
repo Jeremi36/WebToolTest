@@ -337,17 +337,32 @@ app.post("/chat", async (req, res) => {
       max_tokens: 500,
     });
 
-    const reply = completion.choices?.[0]?.message?.content || "No response.";
+    const rawReply = completion.choices?.[0]?.message?.content || "No response.";
+
+let screenshotSummary = "";
+let reply = rawReply;
+
+const match = rawReply.match(/\[SCREENSHOT_SUMMARY\]([\s\S]*?)\[\/SCREENSHOT_SUMMARY\][\s\S]*?\[ANSWER\]([\s\S]*?)\[\/ANSWER\]/);
+
+if (match) {
+  screenshotSummary = match[1].trim();
+  reply = match[2].trim();
+}
     const conversationCode =
       conversation_code || "CONV-" + Math.random().toString(16).slice(2, 10).toUpperCase();
 
     const cleanedMessages = messages.map(msg => {
   if (!Array.isArray(msg.content)) return msg;
 
+  const hasImage = msg.content.some(part => part.type === "image_url");
   const textPart = msg.content.find(part => part.type === "text");
-  let text = textPart?.text || "";
 
+  let text = textPart?.text || "";
   text = text.split("IMPORTANT:")[0].trim();
+
+  if (hasImage && screenshotSummary) {
+    text += `\n\nScreenshot summary: ${screenshotSummary}`;
+  }
 
   return {
     role: msg.role,
