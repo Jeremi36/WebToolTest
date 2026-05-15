@@ -341,10 +341,29 @@ app.post("/chat", async (req, res) => {
     const conversationCode =
       conversation_code || "CONV-" + Math.random().toString(16).slice(2, 10).toUpperCase();
 
-    const finalHistory = [
-      ...messages,
-      { role: "assistant", content: reply }
-    ];
+    const cleanedMessages = messages.map(msg => {
+  if (!Array.isArray(msg.content)) return msg;
+
+  const textPart = msg.content.find(part => part.type === "text");
+  let text = textPart?.text || "";
+
+  text = text.split("IMPORTANT:")[0].trim();
+
+  return {
+    role: msg.role,
+    content: [
+      {
+        type: "text",
+        text
+      }
+    ]
+  };
+});
+
+const finalHistory = [
+  ...cleanedMessages,
+  { role: "assistant", content: reply }
+];
 
     await pool.query(`
       INSERT INTO conversations (conversation_code, license_key, history)
