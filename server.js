@@ -654,7 +654,8 @@ app.get("/admin/conversation/:code", requireAdmin, async (req, res) => {
     const role = m.role === "assistant" ? "AI" : "User";
     let text = "";
     let hasScreenshot = false;
-
+  const hasScreenshotSummary = text.includes("Screenshot summary:");
+    
     if (Array.isArray(m.content)) {
       for (const part of m.content) {
         if (part.type === "text") text += part.text || "";
@@ -664,9 +665,15 @@ app.get("/admin/conversation/:code", requireAdmin, async (req, res) => {
       text = m.content || "";
     }
 
+const hasScreenshotSummary = text.includes("Screenshot summary:");
+    
     return `
       <div class="box">
-        <h3>${role}${role === "User" ? (hasScreenshot ? " (Screenshot attached)" : " (No screenshot attached)") : ""}</h3>
+        <h3>${role}${role === "User"
+  ? (hasScreenshot || hasScreenshotSummary
+      ? " (Screenshot summarized)"
+      : " (No screenshot attached)")
+  : ""}</h3>
         <pre style="white-space:pre-wrap;">${text}</pre>
       </div>
     `;
