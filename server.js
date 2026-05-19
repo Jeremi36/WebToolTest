@@ -724,6 +724,33 @@ app.post("/admin/delete-conversation", requireAdmin, async (req, res) => {
   res.redirect("/admin");
 });
 
+app.post("/conversation/load", async (req, res) => {
+  try {
+    const { license, conversation_code } = req.body;
+
+    if (!license || !conversation_code) {
+      return res.json({ status: "ERROR", message: "Missing license or conversation_code" });
+    }
+
+    const result = await pool.query(
+      `SELECT history FROM conversations
+       WHERE license_key=$1 AND conversation_code=$2`,
+      [license, conversation_code]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({ status: "NOT_FOUND" });
+    }
+
+    return res.json({
+      status: "OK",
+      history: result.rows[0].history
+    });
+  } catch (err) {
+    return res.json({ status: "ERROR", message: err.message });
+  }
+});
+
 initDb().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
