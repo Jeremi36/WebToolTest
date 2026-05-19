@@ -818,6 +818,31 @@ app.post("/conversations/delete", async (req, res) => {
   }
 });
 
+app.post("/conversations/rename", async (req, res) => {
+  try {
+    const { license, conversation_code, conversation_name } = req.body;
+
+    if (!license || !conversation_code || !conversation_name) {
+      return res.json({ status: "ERROR", message: "Missing fields" });
+    }
+
+    const result = await pool.query(`
+      UPDATE conversations
+      SET conversation_name=$1, updated_at=CURRENT_TIMESTAMP
+      WHERE license_key=$2 AND conversation_code=$3
+      RETURNING conversation_code
+    `, [conversation_name, license, conversation_code]);
+
+    if (result.rows.length === 0) {
+      return res.json({ status: "NOT_FOUND" });
+    }
+
+    return res.json({ status: "OK" });
+  } catch (err) {
+    return res.json({ status: "ERROR", message: err.message });
+  }
+});
+
 initDb().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
