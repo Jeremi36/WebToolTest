@@ -99,6 +99,11 @@ async function initDb() {
     );
   `);
 
+await pool.query(`
+  ALTER TABLE conversations
+  ADD COLUMN IF NOT EXISTS conversation_name TEXT;
+`);
+  
   await pool.query(`
     CREATE TABLE IF NOT EXISTS request_logs (
       id SERIAL PRIMARY KEY,
@@ -314,7 +319,7 @@ app.post("/validate", async (req, res) => {
 
 app.post("/chat", async (req, res) => {
   try {
-    const { license, messages, conversation_code } = req.body;
+    const { license, messages, conversation_code, conversation_name } = req.body;
 
     if (!license || !Array.isArray(messages)) {
       return res.json({ status: "ERROR", message: "Missing license or messages" });
@@ -381,12 +386,20 @@ const finalHistory = [
 ];
 
     await pool.query(`
-      INSERT INTO conversations (conversation_code, license_key, history)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (conversation_code)
-      DO UPDATE SET history=$3, updated_at=CURRENT_TIMESTAMP
-    `, [conversationCode, license, JSON.stringify(finalHistory)]);
-
+  INSERT INTO conversations (conversation_code, license_key, history, conversation_name)
+  VALUES ($1, $2, $3, $4)
+  ON CONFLICT (conversation_code)
+  DO UPDATE SET 
+    history=$3,
+    conversation_name=COALESCE(conversations.conversation_name, $4),
+    updated_at=CURRENT_TIMESTAMP
+`, [
+  conversationCode,
+  license,
+  JSON.stringify(finalHistory),
+  conversation_name || null
+]);
+    
     await recordUsage(license, licenseInfo.is_admin);
 
     res.json({
@@ -746,6 +759,60 @@ app.post("/conversation/load", async (req, res) => {
       status: "OK",
       history: result.rows[0].history
     });
+  } catch (err) {
+    return res.json({ status: "ERROR", message: err.message });
+  }
+});
+
+app.post("/conversations/list", async (req, res) => {
+  try {
+    const { license } = req.body;
+
+    if (!license) {
+      return res.json({ status: "ERROR", message: "Missing license" });
+    }
+
+    const licenseInfo = await getLicenseInfo(license);
+
+    if (!licenseInfo || !licenseInfo.active) {
+      return res.json({ status: "INVALID" });
+    }
+
+    const result = await pool.query(`
+      SELECT conversation_code, conversation_name, created_at, updated_at
+      FROM conversations
+      WHERE license_key=$1
+      ORDER BY updated_at DESC
+    `, [license]);
+
+    return res.json({
+      status: "OK",
+      conversations: result.rows
+    });
+  } catch (err) {
+    return res.json({ status: "ERROR", message: err.message });
+  }
+});
+
+app.post("/conversations/delete", async (req, res) => {
+  try {
+    const { license, conversation_code } = req.body;
+
+    if (!license || !conversation_code) {
+      return res.json({ status: "ERROR", message: "Missing fields" });
+    }
+
+    const result = await pool.query(`
+      DELETE FROM conversations
+      WHERE license_key=$1 AND conversation_code=$2
+      RETURNING conversation_code
+    `, [license, conversation_code]);
+
+    if (result.rows.length === 0) {
+      return res.json({ status: "NOT_FOUND" });
+    }
+
+    return res.json({ status: "OK" });
   } catch (err) {
     return res.json({ status: "ERROR", message: err.message });
   }
